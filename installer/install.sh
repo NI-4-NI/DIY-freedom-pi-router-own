@@ -138,10 +138,7 @@ log_section "apt install"
 export DEBIAN_FRONTEND=noninteractive
 apt update
 apt full-upgrade -y
-# preseed iptables-persistent to skip the save-current-rules prompt
-echo "iptables-persistent iptables-persistent/autosave_v4 boolean false" | debconf-set-selections
-echo "iptables-persistent iptables-persistent/autosave_v6 boolean false" | debconf-set-selections
-apt install -y dhcpcd5 hostapd iptables-persistent curl ca-certificates \
+apt install -y dhcpcd5 hostapd nftables curl ca-certificates \
   fail2ban unattended-upgrades
 
 #
@@ -196,16 +193,13 @@ sysctl --system > /dev/null
 log_ok "IP forwarding on"
 
 #
-# iptables and NAT (v4 and v6)
+# nftables firewall (v4 and v6 in one ruleset)
 #
 log_section "firewall and NAT"
-install -d /etc/iptables
-install -m 644 "$CONFIGS_DIR/rules.v4" /etc/iptables/rules.v4
-install -m 644 "$CONFIGS_DIR/rules.v6" /etc/iptables/rules.v6
-# apply now too (so we can verify before reboot)
-iptables-restore  < /etc/iptables/rules.v4
-ip6tables-restore < /etc/iptables/rules.v6
-log_ok "v4 + v6 firewall rules loaded and saved"
+install -m 644 "$CONFIGS_DIR/nftables.conf" /etc/nftables.conf
+nft -f /etc/nftables.conf
+systemctl enable nftables
+log_ok "nftables ruleset loaded and enabled"
 
 #
 # WiFi country code
