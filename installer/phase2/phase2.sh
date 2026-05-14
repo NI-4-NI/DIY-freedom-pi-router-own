@@ -93,10 +93,8 @@ log "setting Pi-hole admin password"
 pihole setpassword "$PIHOLE_ADMIN_PW"
 
 #
-# 5. patch pihole.toml
-#   - listeningMode: LOCAL -> ALL
-#   - [dhcp] block: active=true, start/end/router set
-#   - dnsmasq_lines: replace with our wired DHCP config
+# 5. patch pihole.toml: set listeningMode=ALL so Pi-hole DNS answers on all
+#    interfaces. DHCP is left disabled here; isc-dhcp-server handles it (step 8).
 #
 log "patching /etc/pihole/pihole.toml"
 TOML=/etc/pihole/pihole.toml
@@ -105,20 +103,12 @@ cp "$TOML" "${TOML}.pre-freedom-pi.bak"
 
 python3 << PYEOF
 import re
-import sys
 
 path = "$TOML"
-wifi_start = "$WIFI_DHCP_START"
-wifi_end = "$WIFI_DHCP_END"
-wifi_router = "$WIFI_GATEWAY"
-lan_start = "$LAN_DHCP_START"
-lan_end = "$LAN_DHCP_END"
-lan_router = "$LAN_GATEWAY"
 
 with open(path) as f:
     content = f.read()
 
-# 5a. listeningMode: LOCAL -> ALL
 content = re.sub(
     r'(^\s*listeningMode\s*=\s*)"LOCAL"',
     r'\1"ALL" ### freedom-pi',
@@ -126,44 +116,6 @@ content = re.sub(
     count=1,
     flags=re.MULTILINE
 )
-
-# 5b. [dhcp] block scalars. only patch lines inside [dhcp]...[next section]
-def patch_dhcp_block(text):
-    m = re.search(r'^\[dhcp\]\s*$', text, flags=re.MULTILINE)
-    if not m:
-        sys.stderr.write("no [dhcp] section found\n")
-        return text
-    start = m.end()
-    nxt = re.search(r'^\[[^\]]+\]\s*$', text[start:], flags=re.MULTILINE)
-    end = start + nxt.start() if nxt else len(text)
-    block = text[start:end]
-    block = re.sub(r'(^\s*active\s*=\s*)false', r'\1true ### freedom-pi', block, count=1, flags=re.MULTILINE)
-    block = re.sub(r'(^\s*start\s*=\s*)""', rf'\1"{wifi_start}" ### freedom-pi', block, count=1, flags=re.MULTILINE)
-    block = re.sub(r'(^\s*end\s*=\s*)""', rf'\1"{wifi_end}" ### freedom-pi', block, count=1, flags=re.MULTILINE)
-    block = re.sub(r'(^\s*router\s*=\s*)""', rf'\1"{wifi_router}" ### freedom-pi', block, count=1, flags=re.MULTILINE)
-    return text[:start] + block + text[end:]
-
-content = patch_dhcp_block(content)
-
-# 5c. dnsmasq_lines: replace the (usually empty) array with our wired DHCP config
-new_block = (
-    '  dnsmasq_lines = [\n'
-    '    "interface=eth0",\n'
-    '    "interface=wlan0",\n'
-    f'    "dhcp-range=set:eth0lan,{lan_start},{lan_end},24h",\n'
-    f'    "dhcp-option=tag:eth0lan,option:router,{lan_router}",\n'
-    f'    "dhcp-option=tag:eth0lan,option:dns-server,{lan_router}"\n'
-    '  ] ### freedom-pi'
-)
-content, n = re.subn(
-    r'^\s*dnsmasq_lines\s*=\s*\[[^\]]*\][^\n]*',
-    new_block,
-    content,
-    count=1,
-    flags=re.MULTILINE | re.DOTALL
-)
-if n == 0:
-    sys.stderr.write("warning: dnsmasq_lines pattern did not match\n")
 
 with open(path, "w") as f:
     f.write(content)
@@ -184,7 +136,51 @@ if ! systemctl is-active --quiet pihole-FTL; then
 fi
 
 #
-# 7. weekly Pi-hole update (gravity lists + binary) at Sunday 04:00
+# 7. install Webmin (browser-based management panel, port 10000)
+#
+log "installing Webmin..."
+curl -fsSL https://raw.githubusercontent.com/webmin/webmin/master/setup-repos.sh -o /tmp/webmin-setup.sh
+bash /tmp/webmin-setup.sh --force
+rm -f /tmp/webmin-setup.sh
+apt install -y webmin
+systemctl enable --now webmin
+log "Webmin installed and running on port 10000 (LAN + WiFi only)"
+
+#
+# 8. install isc-dhcp-server (Webmin manages static leases via its DHCP module)
+#
+log "installing isc-dhcp-server..."
+DEBIAN_FRONTEND=noninteractive apt install -y isc-dhcp-server
+
+LAN_SUBNET_NET="${LAN_GATEWAY%.*}.0"
+WIFI_SUBNET_NET="${WIFI_GATEWAY%.*}.0"
+
+cat > /etc/dhcp/dhcpd.conf << EOF
+default-lease-time 86400;
+max-lease-time 86400;
+
+# LAN subnet. Add static host reservations in Webmin -> Servers -> DHCP Server.
+subnet ${LAN_SUBNET_NET} netmask 255.255.255.0 {
+    range ${LAN_DHCP_START} ${LAN_DHCP_END};
+    option routers ${LAN_GATEWAY};
+    option domain-name-servers 1.1.1.1, 1.0.0.1;
+}
+
+# WiFi 5 GHz subnet.
+subnet ${WIFI_SUBNET_NET} netmask 255.255.255.0 {
+    range ${WIFI_DHCP_START} ${WIFI_DHCP_END};
+    option routers ${WIFI_GATEWAY};
+    option domain-name-servers 1.1.1.1, 1.0.0.1;
+}
+EOF
+
+printf 'INTERFACESv4="eth0 wlan0"\nINTERFACESv6=""\n' > /etc/default/isc-dhcp-server
+
+systemctl enable --now isc-dhcp-server
+log "isc-dhcp-server enabled for eth0 (LAN) and wlan0 (WiFi)"
+
+#
+# 9. weekly Pi-hole update (gravity lists + binary) at Sunday 04:00
 #
 log "scheduling weekly pihole -up"
 cat > /etc/cron.d/pihole-update << 'EOF'
@@ -195,7 +191,7 @@ chmod 644 /etc/cron.d/pihole-update
 log "pihole weekly update scheduled"
 
 #
-# 8. disable and clean up this oneshot
+# 10. disable and clean up this oneshot
 #
 log "disabling phase 2 oneshot (self-destruct)"
 systemctl disable freedom-pi-phase2.service

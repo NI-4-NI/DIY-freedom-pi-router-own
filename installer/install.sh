@@ -139,7 +139,7 @@ export DEBIAN_FRONTEND=noninteractive
 apt update
 apt full-upgrade -y
 apt install -y dhcpcd5 hostapd nftables curl ca-certificates \
-  fail2ban unattended-upgrades
+  fail2ban unattended-upgrades cockpit
 
 #
 # swap NetworkManager for dhcpcd
@@ -288,6 +288,12 @@ install -m 644 "$CONFIGS_DIR/apt-daily-upgrade.timer.conf" \
 systemctl daemon-reload
 systemctl enable --now unattended-upgrades
 log_ok "unattended-upgrades enabled (Sunday 04:00, reboot 04:30 if needed)"
+
+# Cockpit: browser-based system dashboard (services, journal, terminal).
+# cockpit-networkmanager is intentionally excluded because this build uses
+# dhcpcd instead of NetworkManager.
+systemctl enable --now cockpit.socket
+log_ok "Cockpit enabled on port 9090 (LAN + WiFi only)"
 
 #
 # stash state for phase 2
