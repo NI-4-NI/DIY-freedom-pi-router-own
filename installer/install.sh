@@ -344,6 +344,10 @@ chmod 600 "$STATE_FILE"
 # drop phase 2 script + systemd oneshot in place
 install -m 755 "$PHASE2_DIR/phase2.sh" "$STATE_DIR/phase2.sh"
 install -m 644 "$PHASE2_DIR/freedom-pi-phase2.service" /etc/systemd/system/freedom-pi-phase2.service
+
+# stage DNS chain configs for phase 2 to copy into place after reboot
+install -m 644 "$CONFIGS_DIR/stubby.yml"          "$STATE_DIR/stubby.yml"
+install -m 644 "$CONFIGS_DIR/unbound-pihole.conf" "$STATE_DIR/unbound-pihole.conf"
 systemctl daemon-reload
 systemctl enable freedom-pi-phase2.service
 log_ok "phase 2 oneshot installed"
