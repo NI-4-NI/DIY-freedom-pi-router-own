@@ -154,6 +154,7 @@ DEBIAN_FRONTEND=noninteractive apt install -y isc-dhcp-server
 
 LAN_SUBNET_NET="${LAN_GATEWAY%.*}.0"
 WIFI_SUBNET_NET="${WIFI_GATEWAY%.*}.0"
+WIFI_2G_SUBNET_NET="${WIFI_2G_GATEWAY%.*}.0"
 
 cat > /etc/dhcp/dhcpd.conf << EOF
 default-lease-time 86400;
@@ -172,12 +173,19 @@ subnet ${WIFI_SUBNET_NET} netmask 255.255.255.0 {
     option routers ${WIFI_GATEWAY};
     option domain-name-servers 1.1.1.1, 1.0.0.1;
 }
+
+# WiFi 2.4 GHz subnet.
+subnet ${WIFI_2G_SUBNET_NET} netmask 255.255.255.0 {
+    range ${WIFI_2G_DHCP_START} ${WIFI_2G_DHCP_END};
+    option routers ${WIFI_2G_GATEWAY};
+    option domain-name-servers 1.1.1.1, 1.0.0.1;
+}
 EOF
 
-printf 'INTERFACESv4="eth0 wlan0"\nINTERFACESv6=""\n' > /etc/default/isc-dhcp-server
+printf 'INTERFACESv4="eth0 wlan0 wlan_onboard"\nINTERFACESv6=""\n' > /etc/default/isc-dhcp-server
 
 systemctl enable --now isc-dhcp-server
-log "isc-dhcp-server enabled for eth0 (LAN) and wlan0 (WiFi)"
+log "isc-dhcp-server enabled for eth0 (LAN), wlan0 (5 GHz), wlan_onboard (2.4 GHz)"
 
 #
 # 9. weekly Pi-hole update (gravity lists + binary) at Sunday 04:00

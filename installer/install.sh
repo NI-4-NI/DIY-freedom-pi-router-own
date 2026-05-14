@@ -37,29 +37,37 @@ require_rpios
 #
 log_section "configuration"
 
-prompt_default    SSID              "WiFi network name (SSID)"          "Freedom"
+prompt_default    SSID_5G           "5 GHz WiFi name (SSID)"            "Freedom-5G"
+prompt_default    SSID_2G           "2.4 GHz WiFi name (SSID)"          "Freedom"
 prompt_password   WPA_PASSPHRASE    "WiFi password (min 8 chars)"
 prompt_default    COUNTRY_CODE      "WiFi country code (2 letters)"     "US"
 prompt_default    LAN_SUBNET        "Wired LAN subnet (x.x.x)"          "192.168.1"
-prompt_default    WIFI_SUBNET       "WiFi subnet (x.x.x)"               "192.168.2"
+prompt_default    WIFI_SUBNET       "5 GHz WiFi subnet (x.x.x)"         "192.168.2"
+prompt_default    WIFI_2G_SUBNET    "2.4 GHz WiFi subnet (x.x.x)"       "192.168.3"
 prompt_password   PIHOLE_ADMIN_PW   "Pi-hole admin password (min 8)"
 
 LAN_GATEWAY="${LAN_SUBNET}.1"
 WIFI_GATEWAY="${WIFI_SUBNET}.1"
+WIFI_2G_GATEWAY="${WIFI_2G_SUBNET}.1"
 LAN_DHCP_START="${LAN_SUBNET}.100"
 LAN_DHCP_END="${LAN_SUBNET}.200"
 WIFI_DHCP_START="${WIFI_SUBNET}.100"
 WIFI_DHCP_END="${WIFI_SUBNET}.200"
+WIFI_2G_DHCP_START="${WIFI_2G_SUBNET}.100"
+WIFI_2G_DHCP_END="${WIFI_2G_SUBNET}.200"
 
 cat << EOF
 
 ${C_BOLD}review:${C_RESET}
-  SSID:             $SSID
+  5 GHz SSID:       $SSID_5G
+  2.4 GHz SSID:     $SSID_2G
   country:          $COUNTRY_CODE
   LAN gateway:      $LAN_GATEWAY
   LAN DHCP range:   $LAN_DHCP_START - $LAN_DHCP_END
-  WiFi gateway:     $WIFI_GATEWAY
-  WiFi DHCP range:  $WIFI_DHCP_START - $WIFI_DHCP_END
+  WiFi 5G gateway:  $WIFI_GATEWAY
+  WiFi 5G DHCP:     $WIFI_DHCP_START - $WIFI_DHCP_END
+  WiFi 2G gateway:  $WIFI_2G_GATEWAY
+  WiFi 2G DHCP:     $WIFI_2G_DHCP_START - $WIFI_2G_DHCP_END
 
 EOF
 prompt_yes_no "proceed?" y || die "aborted"
@@ -178,6 +186,11 @@ if ! grep -q "freedom-pi router config" /etc/dhcpcd.conf; then
     "WIFI_GATEWAY=$WIFI_GATEWAY"
   cat /tmp/dhcpcd.append >> /etc/dhcpcd.conf
   rm -f /tmp/dhcpcd.append
+  if [ "$USE_PANDA" -eq 1 ]; then
+    printf '\ninterface wlan_onboard\nstatic ip_address=%s/24\nnohook wpa_supplicant\n' \
+      "$WIFI_2G_GATEWAY" >> /etc/dhcpcd.conf
+    log_ok "added wlan_onboard static IP ($WIFI_2G_GATEWAY)"
+  fi
   log_ok "added static IPs to dhcpcd.conf"
 else
   log_warn "dhcpcd.conf already has freedom-pi block, skipping"
@@ -217,14 +230,25 @@ if [ "$USE_PANDA" -eq 1 ]; then
 else
   HOSTAPD_SRC="$CONFIGS_DIR/hostapd-builtin.conf"
 fi
-substitute_vars "$HOSTAPD_SRC" /etc/hostapd/hostapd.conf \
-  "SSID=$SSID" \
+substitute_vars "$HOSTAPD_SRC" /etc/hostapd/hostapd-5g.conf \
+  "SSID_5G=$SSID_5G" \
   "COUNTRY_CODE=$COUNTRY_CODE" \
   "WPA_PASSPHRASE=$WPA_PASSPHRASE"
-chmod 600 /etc/hostapd/hostapd.conf
-log_ok "hostapd.conf written"
+chmod 600 /etc/hostapd/hostapd-5g.conf
+log_ok "hostapd-5g.conf written ($SSID_5G)"
 
-install -m 644 "$CONFIGS_DIR/hostapd-default" /etc/default/hostapd
+if [ "$USE_PANDA" -eq 1 ]; then
+  substitute_vars "$CONFIGS_DIR/hostapd-2g.conf" /etc/hostapd/hostapd-2g.conf \
+    "SSID_2G=$SSID_2G" \
+    "COUNTRY_CODE=$COUNTRY_CODE" \
+    "WPA_PASSPHRASE=$WPA_PASSPHRASE"
+  chmod 600 /etc/hostapd/hostapd-2g.conf
+  log_ok "hostapd-2g.conf written ($SSID_2G)"
+  printf 'DAEMON_CONF="/etc/hostapd/hostapd-5g.conf /etc/hostapd/hostapd-2g.conf"\n' \
+    > /etc/default/hostapd
+else
+  printf 'DAEMON_CONF="/etc/hostapd/hostapd-5g.conf"\n' > /etc/default/hostapd
+fi
 
 install -d /etc/systemd/system/hostapd.service.d
 install -m 644 "$CONFIGS_DIR/unblock-rfkill.conf" /etc/systemd/system/hostapd.service.d/unblock-rfkill.conf
@@ -304,13 +328,16 @@ install -d -m 700 "$STATE_DIR"
 # are properly escaped. sourcing this file back into bash is safe.
 {
   echo "# freedom-pi install state, consumed by phase 2 on next boot"
-  printf 'WIFI_GATEWAY=%q\n'      "$WIFI_GATEWAY"
-  printf 'WIFI_DHCP_START=%q\n'   "$WIFI_DHCP_START"
-  printf 'WIFI_DHCP_END=%q\n'     "$WIFI_DHCP_END"
-  printf 'LAN_GATEWAY=%q\n'       "$LAN_GATEWAY"
-  printf 'LAN_DHCP_START=%q\n'    "$LAN_DHCP_START"
-  printf 'LAN_DHCP_END=%q\n'      "$LAN_DHCP_END"
-  printf 'PIHOLE_ADMIN_PW=%q\n'   "$PIHOLE_ADMIN_PW"
+  printf 'WIFI_GATEWAY=%q\n'         "$WIFI_GATEWAY"
+  printf 'WIFI_DHCP_START=%q\n'      "$WIFI_DHCP_START"
+  printf 'WIFI_DHCP_END=%q\n'        "$WIFI_DHCP_END"
+  printf 'WIFI_2G_GATEWAY=%q\n'      "$WIFI_2G_GATEWAY"
+  printf 'WIFI_2G_DHCP_START=%q\n'   "$WIFI_2G_DHCP_START"
+  printf 'WIFI_2G_DHCP_END=%q\n'     "$WIFI_2G_DHCP_END"
+  printf 'LAN_GATEWAY=%q\n'          "$LAN_GATEWAY"
+  printf 'LAN_DHCP_START=%q\n'       "$LAN_DHCP_START"
+  printf 'LAN_DHCP_END=%q\n'         "$LAN_DHCP_END"
+  printf 'PIHOLE_ADMIN_PW=%q\n'      "$PIHOLE_ADMIN_PW"
 } > "$STATE_FILE"
 chmod 600 "$STATE_FILE"
 
@@ -339,8 +366,9 @@ hostapd, installs Pi-hole, and patches its config. takes about 5 minutes.
 
 ${C_YELLOW}${C_BOLD}heads up on SSH:${C_RESET}
   WAN SSH is off. After the reboot you reach the Pi over LAN or WiFi:
-    LAN (eth0):   ssh $REAL_USER@${LAN_GATEWAY}
-    WiFi:         ssh $REAL_USER@${WIFI_GATEWAY}
+    LAN (eth0):     ssh $REAL_USER@${LAN_GATEWAY}
+    WiFi 5 GHz:     ssh $REAL_USER@${WIFI_GATEWAY}
+    WiFi 2.4 GHz:   ssh $REAL_USER@${WIFI_2G_GATEWAY}
   If you were SSH'd in via eth1 plugged into your existing switch, move
   your cable to eth0 (built-in port) or join WiFi after the reboot.
   Also: root SSH is off, MaxAuthTries is 3, fail2ban is watching.
