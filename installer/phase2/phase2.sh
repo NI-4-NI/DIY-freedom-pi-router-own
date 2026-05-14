@@ -184,7 +184,18 @@ if ! systemctl is-active --quiet pihole-FTL; then
 fi
 
 #
-# 7. disable and clean up this oneshot
+# 7. weekly Pi-hole update (gravity lists + binary) at Sunday 04:00
+#
+log "scheduling weekly pihole -up"
+cat > /etc/cron.d/pihole-update << 'EOF'
+# Update Pi-hole gravity lists and binary every Sunday at 04:00
+0 4 * * 0 root pihole -up >> /var/log/pihole-update.log 2>&1
+EOF
+chmod 644 /etc/cron.d/pihole-update
+log "pihole weekly update scheduled"
+
+#
+# 8. disable and clean up this oneshot
 #
 log "disabling phase 2 oneshot (self-destruct)"
 systemctl disable freedom-pi-phase2.service

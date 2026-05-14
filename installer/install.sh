@@ -277,8 +277,17 @@ log_ok "fail2ban enabled (sshd jail)"
 
 # Auto security patches.
 install -m 644 "$CONFIGS_DIR/20auto-upgrades" /etc/apt/apt.conf.d/20auto-upgrades
+
+# Reboot settings: automatic reboot at 04:30 if a package update requires it.
+install -m 644 "$CONFIGS_DIR/52freedom-pi-upgrades" /etc/apt/apt.conf.d/52freedom-pi-upgrades
+
+# Reschedule the upgrade timer to Sunday 04:00 with up to 15 min random spread.
+install -d /etc/systemd/system/apt-daily-upgrade.timer.d
+install -m 644 "$CONFIGS_DIR/apt-daily-upgrade.timer.conf" \
+  /etc/systemd/system/apt-daily-upgrade.timer.d/freedom-pi.conf
+systemctl daemon-reload
 systemctl enable --now unattended-upgrades
-log_ok "unattended-upgrades enabled"
+log_ok "unattended-upgrades enabled (Sunday 04:00, reboot 04:30 if needed)"
 
 #
 # stash state for phase 2

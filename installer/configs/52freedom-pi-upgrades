@@ -1,0 +1,5 @@
+// Automatically reboot if a package update requires it.
+Unattended-Upgrade::Automatic-Reboot "true";
+
+// Reboot at 4:30 AM, after the 4:00 AM upgrade window.
+Unattended-Upgrade::Automatic-Reboot-Time "04:30";
