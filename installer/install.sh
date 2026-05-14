@@ -91,9 +91,9 @@ done
 if [ ${#USB_ETH[@]} -eq 1 ]; then
   UGREEN_IFACE="$(echo "${USB_ETH[0]}" | awk '{print $1}')"
   UGREEN_MAC="$(echo "${USB_ETH[0]}" | awk '{print $2}')"
-  log_ok "picked as UGREEN WAN: $UGREEN_IFACE ($UGREEN_MAC)"
+  log_ok "picked as UGREEN LAN: $UGREEN_IFACE ($UGREEN_MAC)"
 else
-  prompt_default PICK "which number is your UGREEN (WAN)" "1"
+  prompt_default PICK "which number is your UGREEN (LAN)" "1"
   sel="${USB_ETH[$((PICK-1))]}"
   UGREEN_IFACE="$(echo "$sel" | awk '{print $1}')"
   UGREEN_MAC="$(echo "$sel" | awk '{print $2}')"
@@ -366,19 +366,19 @@ hostapd, installs Pi-hole, and patches its config. takes about 5 minutes.
 
 ${C_YELLOW}${C_BOLD}heads up on SSH:${C_RESET}
   WAN SSH is off. After the reboot you reach the Pi over LAN or WiFi:
-    LAN (eth0):     ssh $REAL_USER@${LAN_GATEWAY}
+    LAN (eth1):     ssh $REAL_USER@${LAN_GATEWAY}
     WiFi 5 GHz:     ssh $REAL_USER@${WIFI_GATEWAY}
     WiFi 2.4 GHz:   ssh $REAL_USER@${WIFI_2G_GATEWAY}
-  If you were SSH'd in via eth1 plugged into your existing switch, move
-  your cable to eth0 (built-in port) or join WiFi after the reboot.
+  If you were SSH'd in via eth0 plugged into your modem, move
+  your cable to eth1 (UGREEN, LAN port) or join WiFi after the reboot.
   Also: root SSH is off, MaxAuthTries is 3, fail2ban is watching.
 
 after phase 2, SSH back in and check:
   systemctl is-active hostapd pihole-FTL dhcpcd fail2ban unattended-upgrades
   ip addr show wlan0     # should show ${WIFI_GATEWAY}
-  ip addr show eth0      # should show ${LAN_GATEWAY}
+  ip addr show eth1      # should show ${LAN_GATEWAY}
   sudo fail2ban-client status sshd
-  sudo ip6tables -S      # v6 firewall active
+  sudo nft list ruleset  # nftables rules loaded (v4 + v6)
 
 EOF
 

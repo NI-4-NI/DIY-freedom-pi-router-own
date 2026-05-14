@@ -86,7 +86,7 @@ Runs once automatically on first boot. Installs Pi-hole, patches its config, the
 5. Patches `/etc/pihole/pihole.toml`:
    - `listeningMode` from `LOCAL` to `ALL`
    - `[dhcp]` block active with your WiFi DHCP range
-   - `dnsmasq_lines` set to serve wired LAN DHCP on `eth0`
+   - `listeningMode` set to ALL so Pi-hole DNS answers on all interfaces
 6. Restarts `pihole-FTL`
 7. Disables and removes its own systemd unit (self-destruct)
 

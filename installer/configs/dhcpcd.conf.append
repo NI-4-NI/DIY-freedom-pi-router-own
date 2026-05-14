@@ -1,6 +1,8 @@
 
 # === freedom-pi router config ===
-interface eth0
+# eth0 (Pi built-in) = WAN, gets DHCP from modem automatically, no config needed here.
+
+interface eth1
 static ip_address={{LAN_GATEWAY}}/24
 
 interface wlan0

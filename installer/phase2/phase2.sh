@@ -35,12 +35,12 @@ ip -br addr show wlan0 | grep -q "${WIFI_GATEWAY}" || die "wlan0 never got ${WIF
 #
 # 1b. wait for WAN + DNS before attempting to download Pi-hole
 #
-log "waiting for WAN IP on eth1..."
+log "waiting for WAN IP on eth0..."
 for i in $(seq 1 60); do
-  wan_ip=$(ip -br addr show eth1 2>/dev/null | awk '{print $3}' | cut -d/ -f1)
+  wan_ip=$(ip -br addr show eth0 2>/dev/null | awk '{print $3}' | cut -d/ -f1)
   case "$wan_ip" in
     ""|169.254.*) sleep 1; continue ;;
-    *) log "eth1 up with $wan_ip"; break ;;
+    *) log "eth0 up with $wan_ip"; break ;;
   esac
 done
 
@@ -182,10 +182,10 @@ subnet ${WIFI_2G_SUBNET_NET} netmask 255.255.255.0 {
 }
 EOF
 
-printf 'INTERFACESv4="eth0 wlan0 wlan_onboard"\nINTERFACESv6=""\n' > /etc/default/isc-dhcp-server
+printf 'INTERFACESv4="eth1 wlan0 wlan_onboard"\nINTERFACESv6=""\n' > /etc/default/isc-dhcp-server
 
 systemctl enable --now isc-dhcp-server
-log "isc-dhcp-server enabled for eth0 (LAN), wlan0 (5 GHz), wlan_onboard (2.4 GHz)"
+log "isc-dhcp-server enabled for eth1 (LAN), wlan0 (5 GHz), wlan_onboard (2.4 GHz)"
 
 #
 # 9. weekly Pi-hole update (gravity lists + binary) at Sunday 04:00
