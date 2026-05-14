@@ -6,9 +6,11 @@ Automated version of the big README. Takes a fresh Raspberry Pi OS Lite install 
 
 - Raspberry Pi 5 (any RAM)
 - Fresh Raspberry Pi OS Lite (64-bit) with SSH on and a user set up via the Pi Imager
-- UGREEN 2.5 GbE USB ethernet plugged into a blue USB 3.0 port
+- OS drive: microSD **or** NVMe via the official Pi M.2 HAT (both work; all paths use `/boot/firmware/` which Raspberry Pi OS mounts the same way regardless of boot device)
+- UGREEN USB 1 GbE ethernet adapter plugged into a USB 3.0 port (this becomes the LAN port, eth1)
+- Built-in ethernet port (eth0) connected to your modem for WAN
 - Panda PAU0F AXE3000 USB WiFi (or keep the Pi built-in, installer handles both)
-- Internet on the Pi during install (WAN cable to your modem, or the built-in ethernet plugged into your existing network)
+- Internet on the Pi during install (WAN cable to your modem plugged into the built-in ethernet port)
 
 ## Run it
 
