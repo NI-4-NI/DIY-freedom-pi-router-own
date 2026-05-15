@@ -168,6 +168,25 @@ content = re.sub(
     content, count=1, flags=re.MULTILINE
 )
 
+# FTL NTP: replace pool.ntp.org hostname with Cloudflare IP.
+# Pi-hole v6 has its own NTP client separate from systemd-timesyncd.
+# pool.ntp.org causes the same DNS race on boot as timesyncd would.
+n3 = len(re.findall(r'^\s*server\s*=\s*"pool\.ntp\.org"', content, re.MULTILINE))
+content = re.sub(
+    r'(^\s*server\s*=\s*)"pool\.ntp\.org"',
+    r'\1"162.159.200.1" ### freedom-pi',
+    content, count=1, flags=re.MULTILINE
+)
+
+# DB retention: default 365 days bloats the FTL database to multiple GB
+# on a busy network over time. 30 days is plenty for query history.
+n4 = len(re.findall(r'^\s*maxDBdays\s*=', content, re.MULTILINE))
+content = re.sub(
+    r'(^\s*maxDBdays\s*=\s*)\d+',
+    r'\g<1>30 ### freedom-pi',
+    content, count=1, flags=re.MULTILINE
+)
+
 with open(path, "w") as f:
     f.write(content)
 
@@ -175,6 +194,10 @@ if n1 == 0:
     sys.stderr.write("warning: listeningMode key not found\n")
 if n2 == 0:
     sys.stderr.write("warning: upstreams key not found\n")
+if n3 == 0:
+    sys.stderr.write("warning: ntp server key not found (may already be an IP)\n")
+if n4 == 0:
+    sys.stderr.write("warning: maxDBdays key not found\n")
 print("pihole.toml patched")
 PYEOF
 
@@ -191,7 +214,27 @@ if ! systemctl is-active --quiet pihole-FTL; then
 fi
 
 #
-# 9. install Webmin (browser-based management panel, port 10000)
+# 9. logrotate for Pi-hole
+#    Pi-hole v6 ships no native logrotate entry. copytruncate is required
+#    because pihole-FTL holds the log file open; standard rotation (rename+reopen)
+#    silently fails without it.
+#
+log "writing /etc/logrotate.d/pihole"
+cat > /etc/logrotate.d/pihole << 'EOF'
+/var/log/pihole/pihole.log {
+    weekly
+    rotate 3
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+}
+EOF
+log "pihole logrotate configured (weekly, 3 rotations, copytruncate)"
+
+#
+# 10. install Webmin (browser-based management panel, port 10000)
 #
 log "installing Webmin..."
 curl -fsSL https://raw.githubusercontent.com/webmin/webmin/master/setup-repos.sh -o /tmp/webmin-setup.sh
@@ -202,7 +245,7 @@ systemctl enable --now webmin
 log "Webmin installed and running on port 10000 (LAN + WiFi only)"
 
 #
-# 10. install isc-dhcp-server (Webmin manages static leases via its DHCP module)
+# 11. install isc-dhcp-server (Webmin manages static leases via its DHCP module)
 #
 log "installing isc-dhcp-server..."
 DEBIAN_FRONTEND=noninteractive apt install -y isc-dhcp-server
@@ -237,13 +280,27 @@ subnet ${WIFI_2G_SUBNET_NET} netmask 255.255.255.0 {
 }
 EOF
 
+if [ -n "${NIGHTHAWK_MAC:-}" ]; then
+  NIGHTHAWK_IP="${LAN_GATEWAY%.*}.2"
+  cat >> /etc/dhcp/dhcpd.conf << EOF
+
+# Downstream router (Nighthawk) static reservation.
+# Fixed IP lets firewall rules and FAILOVER.md reference a known address.
+host nighthawk {
+    hardware ethernet ${NIGHTHAWK_MAC};
+    fixed-address ${NIGHTHAWK_IP};
+}
+EOF
+  log "Nighthawk DHCP reservation: $NIGHTHAWK_MAC -> $NIGHTHAWK_IP"
+fi
+
 printf 'INTERFACESv4="eth1 wlan0 wlan_onboard"\nINTERFACESv6=""\n' > /etc/default/isc-dhcp-server
 
 systemctl enable --now isc-dhcp-server
 log "isc-dhcp-server enabled for eth1 (LAN), wlan0 (5 GHz), wlan_onboard (2.4 GHz)"
 
 #
-# 11. weekly Pi-hole update (gravity lists + binary) at Sunday 04:00
+# 12. weekly Pi-hole update (gravity lists + binary) at Sunday 04:00
 #
 log "scheduling weekly pihole -up"
 cat > /etc/cron.d/pihole-update << 'EOF'
@@ -254,7 +311,7 @@ chmod 644 /etc/cron.d/pihole-update
 log "pihole weekly update scheduled"
 
 #
-# 12. disable and clean up this oneshot
+# 13. disable and clean up this oneshot
 #
 log "disabling phase 2 oneshot (self-destruct)"
 systemctl disable freedom-pi-phase2.service
