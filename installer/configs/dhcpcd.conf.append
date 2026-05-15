@@ -1,6 +1,13 @@
 
 # === freedom-pi router config ===
-# eth0 (Pi built-in) = WAN, gets DHCP from modem automatically, no config needed here.
+
+# eth0 = WAN. Longer timeout + reboot retry so the modem has time to hand out
+# a lease after bridge-mode switches or cold boots. metric 100 ensures WAN
+# route wins over any accidental secondary route.
+interface eth0
+metric 100
+timeout 60
+reboot 30
 
 interface eth1
 static ip_address={{LAN_GATEWAY}}/24

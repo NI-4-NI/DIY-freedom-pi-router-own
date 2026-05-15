@@ -45,6 +45,7 @@ prompt_default    LAN_SUBNET        "Wired LAN subnet (x.x.x)"          "192.168
 prompt_default    WIFI_SUBNET       "5 GHz WiFi subnet (x.x.x)"         "192.168.2"
 prompt_default    WIFI_2G_SUBNET    "2.4 GHz WiFi subnet (x.x.x)"       "192.168.3"
 prompt_password   PIHOLE_ADMIN_PW   "Pi-hole admin password (min 8)"
+prompt_default    NIGHTHAWK_MAC     "Downstream router MAC for DHCP reservation (Enter to skip)" ""
 
 LAN_GATEWAY="${LAN_SUBNET}.1"
 WIFI_GATEWAY="${WIFI_SUBNET}.1"
@@ -55,6 +56,11 @@ WIFI_DHCP_START="${WIFI_SUBNET}.100"
 WIFI_DHCP_END="${WIFI_SUBNET}.200"
 WIFI_2G_DHCP_START="${WIFI_2G_SUBNET}.100"
 WIFI_2G_DHCP_END="${WIFI_2G_SUBNET}.200"
+
+NIGHTHAWK_RESERVED=""
+if [ -n "$NIGHTHAWK_MAC" ]; then
+  NIGHTHAWK_RESERVED="${LAN_SUBNET}.2"
+fi
 
 cat << EOF
 
@@ -68,7 +74,7 @@ ${C_BOLD}review:${C_RESET}
   WiFi 5G DHCP:     $WIFI_DHCP_START - $WIFI_DHCP_END
   WiFi 2G gateway:  $WIFI_2G_GATEWAY
   WiFi 2G DHCP:     $WIFI_2G_DHCP_START - $WIFI_2G_DHCP_END
-
+$([ -n "$NIGHTHAWK_MAC" ] && printf "  Nighthawk MAC:    %s -> %s (reserved)\n" "$NIGHTHAWK_MAC" "$NIGHTHAWK_RESERVED")
 EOF
 prompt_yes_no "proceed?" y || die "aborted"
 
@@ -147,7 +153,7 @@ export DEBIAN_FRONTEND=noninteractive
 apt update
 apt full-upgrade -y
 apt install -y dhcpcd5 hostapd nftables curl ca-certificates \
-  fail2ban unattended-upgrades cockpit
+  fail2ban unattended-upgrades cockpit zram-tools
 
 #
 # swap NetworkManager for dhcpcd
@@ -320,6 +326,69 @@ systemctl enable --now cockpit.socket
 log_ok "Cockpit enabled on port 9090 (LAN + WiFi only)"
 
 #
+# log2ram: keep /var/log in RAM, flush periodically to disk
+# reduces NVMe write cycles; also prevents /var/log from filling under burst logging
+#
+log_section "log2ram"
+if ! dpkg -l log2ram &>/dev/null 2>&1; then
+  log_info "adding azlux repo for log2ram..."
+  curl -fsSL https://azlux.fr/repo.gpg \
+    -o /usr/share/keyrings/azlux-archive-keyring.gpg
+  printf 'deb [signed-by=/usr/share/keyrings/azlux-archive-keyring.gpg] http://packages.azlux.fr/debian/ bookworm main\n' \
+    > /etc/apt/sources.list.d/azlux.list
+  apt update -qq
+  apt install -y log2ram
+fi
+sed -i 's/^SIZE=.*/SIZE=128M/' /etc/log2ram.conf
+log_ok "log2ram configured (128M; Pi 3 A+ used 90M which proved tight)"
+
+#
+# zram: compressed swap in RAM (~512 MB on a 2GB Pi)
+# reduces memory pressure when Pi-hole is loading large blocklists
+#
+log_section "zram swap"
+if grep -q '^PERCENTAGE=' /etc/default/zramswap 2>/dev/null; then
+  sed -i 's/^PERCENTAGE=.*/PERCENTAGE=25/' /etc/default/zramswap
+else
+  printf 'PERCENTAGE=25\n' >> /etc/default/zramswap
+fi
+systemctl enable --now zramswap
+log_ok "zram configured (25% RAM = ~512 MB compressed swap)"
+
+#
+# systemd journal: volatile storage so journal lives in /run, not /var/log
+# without this, journal writes to /var/log/journal/ which doubles memory use
+# when /var/log is itself a log2ram tmpfs (hit 44M on Pi 3 A+ despite 20M cap)
+#
+log_section "journal limits"
+install -d /etc/systemd/journald.conf.d
+cat > /etc/systemd/journald.conf.d/router.conf << 'EOF'
+[Journal]
+Storage=volatile
+SystemMaxUse=20M
+RuntimeMaxUse=20M
+EOF
+rm -rf /var/log/journal/
+systemctl restart systemd-journald
+log_ok "journal set to volatile (20 MB cap, lives in /run not /var/log)"
+
+#
+# NTP: use IP addresses, not hostnames
+# hostnames cause a DNS race: timesyncd starts before Pi-hole + Unbound + Stubby
+# are ready. do NOT add After=network-online.target -- that conflicts with
+# Before=sysinit.target in the original unit and silently prevents it starting.
+#
+log_section "NTP time sync"
+cat > /etc/systemd/timesyncd.conf << 'EOF'
+[Time]
+NTP=162.159.200.1 216.239.35.0
+FallbackNTP=69.9.131.124
+EOF
+systemctl enable systemd-timesyncd
+systemctl restart systemd-timesyncd
+log_ok "timesyncd configured (Cloudflare + Google IPs, no hostname DNS dependency)"
+
+#
 # stash state for phase 2
 #
 log_section "staging phase 2"
@@ -338,6 +407,7 @@ install -d -m 700 "$STATE_DIR"
   printf 'LAN_DHCP_START=%q\n'       "$LAN_DHCP_START"
   printf 'LAN_DHCP_END=%q\n'         "$LAN_DHCP_END"
   printf 'PIHOLE_ADMIN_PW=%q\n'      "$PIHOLE_ADMIN_PW"
+  printf 'NIGHTHAWK_MAC=%q\n'        "${NIGHTHAWK_MAC:-}"
 } > "$STATE_FILE"
 chmod 600 "$STATE_FILE"
 
