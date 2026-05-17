@@ -4,9 +4,9 @@
 
 # Raspberry Pi 5 Router with Pi-hole
 
-Turn a Pi 5 into your actual home router. USB ethernet on the WAN side, built-in ethernet on the LAN side, USB WiFi broadcasting your own network. Pi-hole runs on top, blocking ads and trackers on every device.
+Turn a Pi 5 into your actual home router. Built-in ethernet on the WAN side, USB ethernet on the LAN side, USB WiFi broadcasting your network. Pi-hole, Unbound, and Stubby run on top for ad blocking and encrypted DNS.
 
-One command sets the whole thing up on a fresh Raspberry Pi OS Lite SD card.
+One command sets the whole thing up on a fresh Raspberry Pi OS Lite install.
 
 ## Don't wanna read? Run this
 
@@ -24,22 +24,22 @@ Installer docs, what each phase does, and how to recover if something breaks: [i
 
 ### What you need
 
-- Raspberry Pi 5 (any RAM, 8 GB is plenty)
-- microSD card, 32 GB or bigger, class 10 or A2
+- Raspberry Pi 5 (2 GB RAM minimum, 4 GB or 8 GB recommended)
+- NVMe SSD via the official Pi M.2 HAT, **or** a microSD card (32 GB+, class 10 or A2)
 - Official 27W USB-C power supply (cheap knockoffs make the Pi throttle)
 - Two ethernet cables, cat5e or better
-- One USB ethernet adapter for the WAN side (plugs into your modem)
+- One USB ethernet adapter for the LAN side (connects to your switch or downstream router)
 - Keyboard and monitor for first boot, OR an ethernet connection to your existing network
 
 ### What I actually run
 
-My ISP does 927/927 Mbps so I don't need anything fancy on the LAN side. Built-in gigabit is plenty.
+- **WAN (internet side):** Pi 5 built-in 1 GbE ethernet port. Goes straight to the modem. Becomes `eth0`.
+- **LAN (home side):** UGREEN 1 GbE USB-A ethernet adapter. About $15. Plugs into a blue USB 3.0 port, connects to your switch or downstream router. Becomes `eth1`.
+- **WiFi broadcast:** Panda PAU0F AXE3000 USB 3.0, MediaTek MT7921AU (mt76 driver). About $30. Runs 5 GHz AP as `wlan0`. Pi built-in WiFi runs 2.4 GHz AP as `wlan_onboard`.
+- **Boot drive:** Official Raspberry Pi M.2 HAT with Kioxia 128 GB NVMe. No microSD involved.
+- **Power:** Official 27W USB-C supply.
 
-- **WAN (internet side):** UGREEN 2.5 GbE USB-A 3.0, Realtek RTL8156BG. About $25. Plugs into a blue USB 3.0 port, becomes `eth1`.
-- **LAN (home side):** Pi 5's built-in ethernet port. Free, already on the Pi. Becomes `eth0`.
-- **WiFi broadcast:** Panda PAU0F AXE3000 USB 3.0, MediaTek MT7921AU. About $30. Way better than the Pi's built-in WiFi.
-
-Real speeds on my box: 931 Mbps wired, 540 to 600 Mbps on WiFi 6 clients. ~$55 total on top of the Pi.
+Note: this fork inverts the WAN/LAN assignment from the upstream repo. Here the built-in port is WAN and the USB adapter is LAN. Both are 1 GbE so there is no speed difference, this is just a wiring preference.
 
 ### Skip these
 
@@ -52,26 +52,29 @@ Real speeds on my box: 931 Mbps wired, 540 to 600 Mbps on WiFi 6 clients. ~$55 t
 
 ### Phase 1 (about 5 min, you answer prompts)
 
-1. Asks for SSID, WiFi password, country, subnets, Pi-hole admin password
+1. Asks for SSIDs, WiFi password, country, subnets, Pi-hole admin password, optional downstream router MAC for DHCP reservation
 2. Finds your USB ethernet and WiFi radios by MAC, confirms which is which
-3. `apt install`s the packages (dhcpcd5, hostapd, iptables-persistent, curl, fail2ban, unattended-upgrades)
+3. Installs packages (dhcpcd5, hostapd, nftables, curl, fail2ban, unattended-upgrades, cockpit, zram-tools)
 4. Kills NetworkManager, switches to dhcpcd
-5. Writes `.link` files to lock interface names
-6. Writes dhcpcd static IPs, sysctl tuning, iptables v4 + v6 rules, hostapd config
-7. Hardens the host: SSH key-only, root login off, `MaxAuthTries 3`, fail2ban watching sshd, automatic security updates on
-8. Stages the phase 2 oneshot and reboots
+5. Locks interface names by MAC: `eth0` built-in WAN, `eth1` UGREEN LAN, `wlan0` Panda 5 GHz, `wlan_onboard` built-in 2.4 GHz
+6. Writes dhcpcd static IPs with hardened WAN DHCP timing, sysctl tuning, nftables v4+v6 ruleset, hostapd configs
+7. Hardens the host: SSH key-only, root login off, `MaxAuthTries 3`, fail2ban, unattended-upgrades, Cockpit on port 9090
+8. Installs log2ram (128 MB), configures zram swap (25% RAM), sets journal to volatile with 20 MB cap
+9. Configures NTP with IP addresses only (no hostnames, avoids DNS race on boot)
+10. Stages the phase 2 oneshot and reboots
 
 ### Phase 2 (about 5 min, hands off)
 
 Runs automatically on first boot after phase 1.
 
-1. Waits for the WiFi AP to come up
-2. Waits for WAN DHCP and DNS to actually work (otherwise curl dies)
-3. Installs Pi-hole unattended
-4. Sets the admin password
-5. Patches `pihole.toml`: listeningMode ALL, DHCP block for WiFi, dnsmasq_lines for wired LAN
-6. Restarts pihole-FTL
-7. Self-destructs its own systemd unit
+1. Waits for wlan0 and eth0 WAN DHCP to come up before downloading anything
+2. Installs Stubby (DNS-over-TLS) and Unbound (caching forwarder)
+3. Installs Pi-hole unattended, sets admin password
+4. Patches `pihole.toml`: listeningMode ALL, DNS upstream to Unbound, FTL NTP to IP address, DB retention 30 days
+5. Writes `/etc/logrotate.d/pihole` with copytruncate
+6. Installs Webmin (port 10000), isc-dhcp-server, adds Nighthawk DHCP reservation if MAC was provided
+7. Schedules weekly `pihole -up` at Sunday 04:00
+8. Self-destructs its own systemd unit
 
 Logs land in `/var/log/freedom-pi-phase2.log`. Full breakdown in [installer/README.md](installer/README.md).
 
@@ -79,10 +82,11 @@ Logs land in `/var/log/freedom-pi-phase2.log`. Full breakdown in [installer/READ
 
 The installer configures the Pi to BE a router, but doesn't rewire your house. Do that part once phase 2 is finished:
 
-1. Unplug the cable from your ISP modem to your switch (that cable is what's bypassing the Pi).
-2. Plug the ISP modem into the UGREEN USB adapter on the Pi (WAN side, `eth1`).
-3. Plug the Pi's built-in ethernet port (LAN side, `eth0`) into your switch.
-4. Each computer on the switch grabs a new IP from the Pi within ~10 seconds. If one is stubborn, unplug and replug its cable.
+1. Plug the ISP modem (or modem in bridge mode) into the Pi's **built-in ethernet port** (`eth0`, WAN side).
+2. Plug the Pi's **UGREEN USB ethernet adapter** (`eth1`, LAN side) into your switch or downstream router.
+3. Each device on the LAN grabs a new IP from the Pi within ~10 seconds. If one is stubborn, unplug and replug its cable.
+
+See [FAILOVER.md](../FAILOVER.md) for the full cascade setup, bypass procedure, and pre-test checklist if you're running the Pi behind a modem in bridge mode with a downstream router.
 
 Verify you're actually inline:
 
@@ -90,10 +94,10 @@ Verify you're actually inline:
 ip -br addr | grep -E 'eth|wlan'
 ```
 
-- `eth1` should have the ISP-assigned IP (like `10.x.x.x/22`)
-- `eth0` should only have your static `192.168.1.1/24`, no ISP IP on it
+- `eth0` should have the ISP-assigned public IP (or modem-assigned IP in bridge mode)
+- `eth1` should only have your static LAN gateway IP (e.g. `192.168.1.1/24`), no ISP IP on it
 
-If `eth0` has two IPs, the modem-to-switch bypass cable is still plugged in somewhere. Find it and unplug it.
+If `eth1` has two IPs, a modem-to-switch bypass cable is still plugged in somewhere. Find it and unplug it.
 
 ## Client-side gotchas
 
@@ -109,7 +113,7 @@ Out of the box the installer locks the Pi down so you're not exposing a router t
 
 ### Firewall
 
-- v4 INPUT defaults to DROP. LAN (`eth0`) and WiFi (`wlan0`) get the usual ports (SSH, DNS, DHCP, HTTP, HTTPS, ICMP). WAN (`eth1`) accepts nothing unsolicited, only return traffic for connections your LAN started.
+- v4 INPUT defaults to DROP. LAN (`eth1`) and WiFi (`wlan0`, `wlan_onboard`) get the usual ports (SSH, DNS, DHCP, HTTP, HTTPS, ICMP). WAN (`eth0`) accepts nothing unsolicited, only return traffic for connections your LAN started.
 - v6 INPUT defaults to DROP too. That matters because IPv6 has no NAT, so every device behind your modem typically gets its own public address. Without a v6 firewall, the Pi's SSH and Pi-hole admin would be reachable from the whole v6 internet.
 - LAN and WiFi subnets aren't bridged. A compromised WiFi device can't touch your wired machines without going back through the Pi.
 
