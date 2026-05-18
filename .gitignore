@@ -16,3 +16,10 @@ install.conf
 # build/test artifacts
 *.log
 *.tmp
+# Ruflo (local agent tooling, not part of the installer)
+.claude/
+.claude-flow/
+CLAUDE.md
+agentdb.rvf
+agentdb.rvf.lock
+.ruflo/
