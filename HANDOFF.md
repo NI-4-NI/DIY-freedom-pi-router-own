@@ -41,6 +41,7 @@ Pi-hole -> Unbound (127.0.0.1:5335) -> Stubby (127.0.0.1:5453) -> Cloudflare/Qua
 ## Everything committed (full history)
 
 ```
+4940d59  Replace Nighthawk with Cudy AX3000 (OpenWrt), add fan curve, add PLANNED.md + PRETEST.md
 ccbb86b  Fix root README: correct eth0/eth1 orientation, NVMe hardware, current installer steps
 aa78fc5  Add FAILOVER.md and update installer README
 050794f  Phase 2: FTL NTP IP patch, DB retention 30d, logrotate copytruncate, Nighthawk DHCP reservation
@@ -70,6 +71,7 @@ fc89d7f  Add dual-band WiFi: 5 GHz on Panda, 2.4 GHz on Pi built-in
 - Configures zram swap (25% RAM = ~512 MB)
 - Sets journald to volatile + 20M cap (prevents overflow when /var/log is a tmpfs)
 - Configures timesyncd with IP-only NTP: 162.159.200.1, 216.239.35.0, 69.9.131.124
+- Writes Pi 5 active cooler fan curve to /boot/firmware/config.txt (starts at 50°C)
 - WAN DHCP hardening on eth0: metric 100, timeout 60, reboot 30
 - Writes nftables.conf, dhcpcd.conf, hostapd configs, sysctl, SSH hardening
 - Saves state to /etc/freedom-pi/install.conf (including DOWNSTREAM_MAC)
@@ -110,6 +112,8 @@ installer/configs/
   stubby.yml                      DoT config
   unbound-pihole.conf             Unbound forwarder config
 FAILOVER.md                       cable-swap procedures (outcomes A/B/C)
+PRETEST.md                        pre-test checklist + test night procedure
+PLANNED.md                        all deferred future features
 installer/README.md               full installer docs + Known Issues Mitigated
 README.md                         project overview (now accurate for this fork)
 ```
