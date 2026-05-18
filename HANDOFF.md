@@ -41,6 +41,8 @@ Pi-hole -> Unbound (127.0.0.1:5335) -> Stubby (127.0.0.1:5453) -> Cloudflare/Qua
 ## Everything committed (full history)
 
 ```
+aab0a4d  Expand PRETEST.md: wiring diagrams, XB8 bridge mode steps, full install sequence
+2f730e1  Update HANDOFF.md: latest commit, fan curve, PLANNED.md + PRETEST.md in key files
 4940d59  Replace Nighthawk with Cudy AX3000 (OpenWrt), add fan curve, add PLANNED.md + PRETEST.md
 ccbb86b  Fix root README: correct eth0/eth1 orientation, NVMe hardware, current installer steps
 aa78fc5  Add FAILOVER.md and update installer README
@@ -165,11 +167,16 @@ Physical (do before test night):
 4. Assemble Pi: M.2 HAT, NVMe, UGREEN in USB 3.0 port, Panda in USB, 27W PSU
 
 Running installer:
-5. Boot Pi, SSH in, clone repo or scp installer folder
-6. sudo installer/install.sh
+5. Boot Pi (eth0 plugged into XB8 LAN for internet during install), SSH in, clone repo
+6. sudo ~/DIY-freedom-pi-router-own/installer/install.sh
 7. Answer all prompts (have Cudy WAN MAC ready for the DHCP reservation step)
 
-Test night procedure: see PRETEST.md
+After install:
+8. Enable XB8 bridge mode (Xfinity app, web admin at 10.0.0.1, or call Comcast)
+9. Plug Pi eth1 (UGREEN) into Cudy WAN port
+10. Reboot: XB8 first, then Pi, then Cudy
+
+Full step-by-step with wiring diagrams: see PRETEST.md
 
 ---
 
