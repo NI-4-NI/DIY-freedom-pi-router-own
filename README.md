@@ -72,7 +72,7 @@ Runs automatically on first boot after phase 1.
 3. Installs Pi-hole unattended, sets admin password
 4. Patches `pihole.toml`: listeningMode ALL, DNS upstream to Unbound, FTL NTP to IP address, DB retention 30 days
 5. Writes `/etc/logrotate.d/pihole` with copytruncate
-6. Installs Webmin (port 10000), isc-dhcp-server, adds Nighthawk DHCP reservation if MAC was provided
+6. Installs Webmin (port 10000), isc-dhcp-server, adds downstream router DHCP reservation if MAC was provided
 7. Schedules weekly `pihole -up` at Sunday 04:00
 8. Self-destructs its own systemd unit
 

@@ -12,24 +12,24 @@ Coax from wall
       -> Pi eth0 (WAN)
           Pi runs router + Pi-hole + upstairs WiFi (2 bands)
       -> Pi eth1 (LAN)
-          -> Nighthawk WAN port
-              Nighthawk runs downstairs WiFi + its own subnet
+          -> Cudy AX3000 WAN port
+              Cudy runs downstairs WiFi + its own subnet (192.168.20.x)
 ```
 
 ---
 
-## Outcome B: Pi is down, Nighthawk takes over (one cable swap)
+## Outcome B: Pi is down, Cudy takes over (one cable swap)
 
 Use this if the Pi won't boot, won't route, or you need internet now and can debug later.
-The XB8 stays in bridge mode. No config changes needed on the Nighthawk.
+The XB8 stays in bridge mode. No config changes needed on the Cudy.
 
 **Steps:**
 
 1. Unplug the cable from XB8 LAN port going to Pi eth0.
-2. Unplug the cable from Pi eth1 going to Nighthawk WAN.
-3. Plug a cable directly from XB8 LAN port to Nighthawk WAN port.
-4. Wait 60 seconds. Nighthawk pulls a public IP from Comcast directly.
-5. Reconnect devices to Nighthawk's WiFi.
+2. Unplug the cable from Pi eth1 going to Cudy WAN.
+3. Plug a cable directly from XB8 LAN port to Cudy WAN port.
+4. Wait 60 seconds. Cudy pulls a public IP from Comcast directly.
+5. Reconnect devices to Cudy's WiFi.
 
 You now have internet. No Pi-hole, no upstairs Pi WiFi, but the house is online.
 Debug the Pi tomorrow.
@@ -37,8 +37,8 @@ Debug the Pi tomorrow.
 ```
 Coax from wall
   -> XB8 (bridge mode, still)
-      -> Nighthawk WAN port  <-- direct, no Pi in the middle
-          Nighthawk runs all WiFi + routing
+      -> Cudy AX3000 WAN port  <-- direct, no Pi in the middle
+          Cudy runs all WiFi + routing
 ```
 
 ---
@@ -79,9 +79,9 @@ usually minimal.
 
 ---
 
-## Nighthawk IP reservation
+## Cudy AX3000 IP reservation
 
-If you provided the Nighthawk MAC during install, it always gets the same IP
+If you provided the Cudy's WAN MAC during install, it always gets the same IP
 from the Pi's DHCP server: `<LAN_SUBNET>.2` (e.g. `192.168.1.2`).
 
 This means if you ever add nftables rules that reference the downstream router,
@@ -89,32 +89,4 @@ the IP will never change even after a reboot or lease renewal.
 
 ---
 
-## Pre-test checklist (do this before the test night)
-
-- [ ] Factory reset Nighthawk, configure LAN subnet as something different from
-      the Pi's subnets (e.g. 192.168.20.x vs Pi's 192.168.1.x)
-- [ ] Test Nighthawk in bypass mode: plug it directly into XB8, confirm internet
-      works, plug it back into normal position. This proves outcome B works before
-      you need it.
-- [ ] Write down the XB8 admin password (on the sticker or what you set).
-      You need it for outcome C.
-- [ ] Have a phone on cellular as backup internet during the test.
-- [ ] Know where all three cables are before you start:
-      - Coax to XB8 (don't touch this one)
-      - XB8 LAN -> Pi eth0 (WAN cable)
-      - Pi eth1 -> Nighthawk WAN (LAN cable)
-
----
-
-## Test night order of operations
-
-1. Connect cables in outcome A layout.
-2. Enable bridge mode on XB8 via 10.0.0.1 (or call Comcast).
-3. Reboot: XB8 first, then Pi, then Nighthawk. Wait 2-3 minutes.
-4. Connect a laptop to Pi's WiFi. Confirm internet + check Pi-hole is seeing queries.
-5. Connect a laptop to Nighthawk's WiFi. Confirm internet.
-6. Dry-run outcome B: swap to direct cable, confirm Nighthawk works standalone.
-   Swap back to cascade.
-
-If step 4/5 is broken and you can't figure it out in 30 minutes, do outcome B
-and sleep. The house has internet.
+See [PRETEST.md](PRETEST.md) for the full pre-test checklist, OpenWrt setup steps, and test night procedure.

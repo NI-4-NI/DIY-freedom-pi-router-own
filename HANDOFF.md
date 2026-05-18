@@ -27,7 +27,7 @@ Fork repo: https://github.com/NI-4-NI/DIY-freedom-pi-router-own
 
 Network plan:
 - Pi upstairs: runs router, Pi-hole, both WiFi bands
-- Nighthawk downstream on Pi eth1: runs its own subnet for downstairs
+- Cudy AX3000 (OpenWrt) downstream on Pi eth1: runs its own subnet for downstairs (192.168.20.x)
 - XB8 Comcast gateway: in bridge mode (modem only) during Pi operation
 
 ---
@@ -62,7 +62,7 @@ fc89d7f  Add dual-band WiFi: 5 GHz on Panda, 2.4 GHz on Pi built-in
 ### Phase 1 (install.sh)
 
 - Prompts: SSIDs, WiFi password, country, subnets, Pi-hole admin password,
-  optional Nighthawk MAC for DHCP reservation
+  optional downstream router MAC for DHCP reservation
 - Detects UGREEN and Panda by MAC, locks interface names via .link files
 - apt installs: dhcpcd5, hostapd, nftables, curl, ca-certificates, fail2ban,
   unattended-upgrades, cockpit, zram-tools
@@ -72,7 +72,7 @@ fc89d7f  Add dual-band WiFi: 5 GHz on Panda, 2.4 GHz on Pi built-in
 - Configures timesyncd with IP-only NTP: 162.159.200.1, 216.239.35.0, 69.9.131.124
 - WAN DHCP hardening on eth0: metric 100, timeout 60, reboot 30
 - Writes nftables.conf, dhcpcd.conf, hostapd configs, sysctl, SSH hardening
-- Saves state to /etc/freedom-pi/install.conf (including NIGHTHAWK_MAC)
+- Saves state to /etc/freedom-pi/install.conf (including DOWNSTREAM_MAC)
 - Reboots into phase 2
 
 ### Phase 2 (phase2.sh, runs once on first boot)
@@ -88,7 +88,7 @@ fc89d7f  Add dual-band WiFi: 5 GHz on Panda, 2.4 GHz on Pi built-in
 - Writes /etc/logrotate.d/pihole with copytruncate
 - Installs Webmin (port 10000)
 - Installs isc-dhcp-server, writes dhcpd.conf for all three subnets
-- Writes Nighthawk static DHCP reservation (LAN_SUBNET.2) if MAC was provided
+- Writes downstream router static DHCP reservation (LAN_SUBNET.2) if MAC was provided
 - Schedules weekly pihole -up at Sunday 04:00
 - Self-destructs
 
@@ -140,40 +140,32 @@ All of these were discovered on a Pi 3 A+ and pre-fixed in the installer:
 
 ## What's NOT done yet (deferred)
 
-- **Monitoring/alerts** - disk usage, WAN watchdog. User wants to handle this
-  with Netdata + Healthchecks.io in a future session. No webhook infrastructure
-  added yet.
+See [PLANNED.md](PLANNED.md) for the full list. Short version:
 
-- **Tailscale exit node** - Pi as Tailscale exit node for remote Pi-hole access.
-  Planned but not started. Will need nftables rules for the tunnel interface.
-
-- **Homarr dashboard, Healthchecks.io + Discord, Netdata** - all queued for
-  future sessions after the Pi is live and stable.
-
-- **Pi 3 A+ Pi-hole migration** - existing Pi 3 A+ runs Pi-hole. Teleporter
-  backup/restore is already coded into phase 2 (checks for
-  /boot/firmware/pihole-teleporter.tar.gz). User will add blocklists manually
-  rather than restoring from backup.
+- Netdata monitoring
+- Healthchecks.io + Discord alerts (disk >80%, WAN watchdog)
+- Tailscale exit node (needs nftables rules for `tailscale0`)
+- Homarr dashboard
+- 2-inch LCD display + rotary encoder for local status
 
 ---
 
 ## What's left before the first test run
 
+See [PRETEST.md](PRETEST.md) for the full checklist. Short version:
+
 Physical (do before test night):
-1. Flash Pi OS Lite 64-bit to NVMe using Pi Imager
-   - Set hostname, enable SSH, create user in Imager before flashing
-2. Assemble Pi: M.2 HAT, NVMe, UGREEN in USB 3.0 port, Panda in USB, 27W PSU
-3. Factory reset Nighthawk, configure on a different subnet (e.g. 192.168.20.x)
-4. Test Nighthawk in bypass mode: plug direct to XB8, confirm internet works, plug back
-5. Get Nighthawk MAC address (sticker on bottom)
-6. Know XB8 admin password (sticker or your set password) for bridge mode
+1. Flash Cudy AX3000 to OpenWrt, change its LAN to 192.168.20.x, note WAN MAC
+2. Test Cudy in bypass mode off XB8, confirm internet
+3. Flash Pi OS Lite 64-bit to NVMe using Pi Imager (set hostname, SSH, user)
+4. Assemble Pi: M.2 HAT, NVMe, UGREEN in USB 3.0 port, Panda in USB, 27W PSU
 
 Running installer:
-7. Boot Pi, SSH in, clone repo or scp installer folder
-8. sudo installer/install.sh
-9. Answer all prompts (have Nighthawk MAC ready)
+5. Boot Pi, SSH in, clone repo or scp installer folder
+6. sudo installer/install.sh
+7. Answer all prompts (have Cudy WAN MAC ready for the DHCP reservation step)
 
-Test night procedure: see FAILOVER.md
+Test night procedure: see PRETEST.md
 
 ---
 

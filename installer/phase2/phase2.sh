@@ -280,18 +280,18 @@ subnet ${WIFI_2G_SUBNET_NET} netmask 255.255.255.0 {
 }
 EOF
 
-if [ -n "${NIGHTHAWK_MAC:-}" ]; then
-  NIGHTHAWK_IP="${LAN_GATEWAY%.*}.2"
+if [ -n "${DOWNSTREAM_MAC:-}" ]; then
+  DOWNSTREAM_IP="${LAN_GATEWAY%.*}.2"
   cat >> /etc/dhcp/dhcpd.conf << EOF
 
-# Downstream router (Nighthawk) static reservation.
+# Downstream router (Cudy AX3000) static reservation.
 # Fixed IP lets firewall rules and FAILOVER.md reference a known address.
-host nighthawk {
-    hardware ethernet ${NIGHTHAWK_MAC};
-    fixed-address ${NIGHTHAWK_IP};
+host downstream {
+    hardware ethernet ${DOWNSTREAM_MAC};
+    fixed-address ${DOWNSTREAM_IP};
 }
 EOF
-  log "Nighthawk DHCP reservation: $NIGHTHAWK_MAC -> $NIGHTHAWK_IP"
+  log "Downstream router DHCP reservation: $DOWNSTREAM_MAC -> $DOWNSTREAM_IP"
 fi
 
 printf 'INTERFACESv4="eth1 wlan0 wlan_onboard"\nINTERFACESv6=""\n' > /etc/default/isc-dhcp-server

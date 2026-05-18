@@ -45,7 +45,7 @@ prompt_default    LAN_SUBNET        "Wired LAN subnet (x.x.x)"          "192.168
 prompt_default    WIFI_SUBNET       "5 GHz WiFi subnet (x.x.x)"         "192.168.2"
 prompt_default    WIFI_2G_SUBNET    "2.4 GHz WiFi subnet (x.x.x)"       "192.168.3"
 prompt_password   PIHOLE_ADMIN_PW   "Pi-hole admin password (min 8)"
-prompt_default    NIGHTHAWK_MAC     "Downstream router MAC for DHCP reservation (Enter to skip)" ""
+prompt_default    DOWNSTREAM_MAC    "Downstream router MAC for DHCP reservation (Enter to skip)" ""
 
 LAN_GATEWAY="${LAN_SUBNET}.1"
 WIFI_GATEWAY="${WIFI_SUBNET}.1"
@@ -57,9 +57,9 @@ WIFI_DHCP_END="${WIFI_SUBNET}.200"
 WIFI_2G_DHCP_START="${WIFI_2G_SUBNET}.100"
 WIFI_2G_DHCP_END="${WIFI_2G_SUBNET}.200"
 
-NIGHTHAWK_RESERVED=""
-if [ -n "$NIGHTHAWK_MAC" ]; then
-  NIGHTHAWK_RESERVED="${LAN_SUBNET}.2"
+DOWNSTREAM_RESERVED=""
+if [ -n "$DOWNSTREAM_MAC" ]; then
+  DOWNSTREAM_RESERVED="${LAN_SUBNET}.2"
 fi
 
 cat << EOF
@@ -74,7 +74,7 @@ ${C_BOLD}review:${C_RESET}
   WiFi 5G DHCP:     $WIFI_DHCP_START - $WIFI_DHCP_END
   WiFi 2G gateway:  $WIFI_2G_GATEWAY
   WiFi 2G DHCP:     $WIFI_2G_DHCP_START - $WIFI_2G_DHCP_END
-$([ -n "$NIGHTHAWK_MAC" ] && printf "  Nighthawk MAC:    %s -> %s (reserved)\n" "$NIGHTHAWK_MAC" "$NIGHTHAWK_RESERVED")
+$([ -n "$DOWNSTREAM_MAC" ] && printf "  Downstream MAC:   %s -> %s (reserved)\n" "$DOWNSTREAM_MAC" "$DOWNSTREAM_RESERVED")
 EOF
 prompt_yes_no "proceed?" y || die "aborted"
 
@@ -389,6 +389,26 @@ systemctl restart systemd-timesyncd
 log_ok "timesyncd configured (Cloudflare + Google IPs, no hostname DNS dependency)"
 
 #
+# Pi 5 active cooler fan curve
+# fan starts at 50°C instead of the default ~67°C — better for 24/7 router duty
+# speeds are PWM values (0-255); temps are milli-Celsius (50000 = 50°C)
+#
+log_section "Pi 5 active cooler fan curve"
+if ! grep -q 'freedom-pi fan curve' /boot/firmware/config.txt 2>/dev/null; then
+  cat >> /boot/firmware/config.txt << 'EOF'
+
+# freedom-pi fan curve: active cooler starts spinning at 50°C for 24/7 router duty
+dtparam=fan_temp0=50000,fan_temp0_hyst=5000,fan_temp0_speed=75
+dtparam=fan_temp1=60000,fan_temp1_hyst=5000,fan_temp1_speed=125
+dtparam=fan_temp2=70000,fan_temp2_hyst=5000,fan_temp2_speed=175
+dtparam=fan_temp3=80000,fan_temp3_hyst=5000,fan_temp3_speed=225
+EOF
+  log_ok "fan curve written to config.txt (starts at 50°C)"
+else
+  log_warn "fan curve already in config.txt, skipping"
+fi
+
+#
 # stash state for phase 2
 #
 log_section "staging phase 2"
@@ -407,7 +427,7 @@ install -d -m 700 "$STATE_DIR"
   printf 'LAN_DHCP_START=%q\n'       "$LAN_DHCP_START"
   printf 'LAN_DHCP_END=%q\n'         "$LAN_DHCP_END"
   printf 'PIHOLE_ADMIN_PW=%q\n'      "$PIHOLE_ADMIN_PW"
-  printf 'NIGHTHAWK_MAC=%q\n'        "${NIGHTHAWK_MAC:-}"
+  printf 'DOWNSTREAM_MAC=%q\n'       "${DOWNSTREAM_MAC:-}"
 } > "$STATE_FILE"
 chmod 600 "$STATE_FILE"
 

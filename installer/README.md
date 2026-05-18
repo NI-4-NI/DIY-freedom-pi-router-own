@@ -98,7 +98,7 @@ Runs once automatically on first boot. Installs the DNS chain, Pi-hole, Webmin, 
 7. Restarts `pihole-FTL`
 8. Writes `/etc/logrotate.d/pihole` with `copytruncate` (required since FTL holds the log file open)
 9. Installs Webmin (port 10000)
-10. Installs isc-dhcp-server, writes subnet config for LAN + both WiFi subnets, adds Nighthawk static reservation if MAC was provided
+10. Installs isc-dhcp-server, writes subnet config for LAN + both WiFi subnets, adds downstream router static reservation if MAC was provided
 11. Schedules weekly `pihole -up` at Sunday 04:00
 12. Disables and removes its own systemd unit (self-destruct)
 
