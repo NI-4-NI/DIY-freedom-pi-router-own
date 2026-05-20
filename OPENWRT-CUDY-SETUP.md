@@ -128,7 +128,10 @@ This is the value the Pi installer asks for when it sets up the DHCP reservation
 
 ### Wireless
 
-1. **Network → Wireless**. You'll see two radios: `radio0` (5 GHz / 802.11ax) and `radio1` (2.4 GHz / 802.11ax).
+1. **Network → Wireless**. You'll see two radios. The OpenWrt overview labels each one with its band (2.4 GHz / 5 GHz) next to the radio name — check that before assigning SSIDs.
+
+   On MT7981 boards the band assignment is sometimes reversed from what documentation suggests: `radio0` may be 2.4 GHz and `radio1` may be 5 GHz. The procedure works either way — just assign the `-5G` and `-2G` SSID suffixes to whichever radio the UI shows as 5 GHz and 2.4 GHz respectively.
+
 2. For each radio:
    - Click **Edit** on the default disabled SSID.
    - Tab: Device Configuration → confirm channel set to **auto** (or pick manually if you want).
@@ -157,6 +160,44 @@ Defer this until after the Cudy is plugged into the Pi 5 and has internet. Then:
 2. `opkg update`
 3. `opkg list-upgradable`
 4. Selectively upgrade packages with `opkg upgrade <name>`. Don't blindly upgrade everything, OpenWrt's overlay storage is small and a full upgrade can fill it.
+
+---
+
+## Maintenance and future updates
+
+### Backing up your config
+
+Before any firmware change, save your current config:
+
+- LuCI → **System → Backup / Flash Firmware → Generate archive**. This downloads a `.tar.gz` of all your `/etc/config/` files: network, wireless, DHCP leases, firewall.
+- Keep one copy somewhere off the router. If you flash with settings reset, this is what you restore from.
+
+### Package-level updates (routine)
+
+Run after the Cudy has been live for a while, over SSH:
+
+```bash
+opkg update
+opkg list-upgradable
+opkg upgrade <package-name>   # upgrade specific packages, not everything at once
+```
+
+Never run `opkg upgrade` with no arguments — it can overwrite kernel modules and break the system. Upgrade selectively: `luci`, `dropbear`, `openssl` packages are generally safe. Kernel and driver packages are risky without a matching kernel version.
+
+### OpenWrt version upgrades (major or minor releases)
+
+When a new OpenWrt release is published for the WR3000 v1:
+
+1. Download the new **sysupgrade** image from the firmware selector (same URL as File B in the flash procedure).
+2. Back up your config (see above).
+3. LuCI → **System → Backup / Flash Firmware → Flash new firmware image**.
+   - **Minor version upgrade** (e.g. 24.x → 24.x+1): "Keep settings" is usually safe if you haven't done anything exotic. Flash, reboot, verify everything works.
+   - **Major version upgrade** (e.g. 24.x → 25.x): flash with **"Keep settings" unchecked**. Config files from a major version can carry stale values that cause subtle breakage. Reconfigure from scratch after reboot.
+4. After a settings-reset flash, redo in order: root password, LAN IP (192.168.20.1), DHCP pool, WAN mode, both WiFi radios, hostname, timezone.
+
+### Static DHCP leases
+
+If you've added static leases (Network → DHCP and DNS → Static Leases), they're included in the config backup archive. After a settings-reset upgrade, re-import or re-add them manually.
 
 ---
 

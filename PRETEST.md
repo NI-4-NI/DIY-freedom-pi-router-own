@@ -35,6 +35,8 @@ Pi also broadcasts:
   [wlan_onboard]          <-- 2.4 GHz AP, 192.168.3.x (default, set at install)
 ```
 
+Each interface gets its own subnet. Devices on 192.168.10.x (wired LAN), 192.168.2.x (5 GHz), and 192.168.3.x (2.4 GHz) can all reach the internet and Pi-hole through the Pi, but are isolated from each other at layer 3. The Pi's eth1 gateway is `192.168.10.1`, wlan0 gateway is `192.168.2.1`, wlan_onboard gateway is `192.168.3.1`.
+
 ---
 
 ## Step 1: Set up the Cudy WR3000 v1
@@ -64,7 +66,7 @@ Also do the bypass test from that doc: plug Cudy WAN into XB8 LAN directly, conf
    ```bash
    git clone https://github.com/NI-4-NI/DIY-freedom-pi-router-own.git
    ```
-   Or copy from your Mac:
+   Or copy from your laptop:
    ```bash
    scp -r installer youruser@<pi-ip>:~/
    ```
