@@ -161,7 +161,7 @@ See [PLANNED.md](PLANNED.md) for the full list. Short version:
 See [PRETEST.md](PRETEST.md) for the full checklist. Short version:
 
 Physical (do before test night):
-1. Flash Cudy AX3000 to OpenWrt, change its LAN to 192.168.20.x, note WAN MAC
+1. Flash Cudy WR3000 v1 to OpenWrt (two-step: File A via stock UI, then File B sysupgrade via LuCI). Check S/N first — 2543+ is a different revision. Change LAN to 192.168.20.x, note WAN MAC from OpenWrt admin
 2. Test Cudy in bypass mode off XB8, confirm internet
 3. Flash Pi OS Lite 64-bit to NVMe using Pi Imager (set hostname, SSH, user)
 4. Assemble Pi: M.2 HAT, NVMe, UGREEN in USB 3.0 port, Panda in USB, 27W PSU

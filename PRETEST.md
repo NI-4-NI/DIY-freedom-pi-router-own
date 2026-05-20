@@ -37,23 +37,37 @@ Pi also broadcasts:
 
 ---
 
-## Step 1: Set up the Cudy AX3000 (do this first, while internet is still normal)
+## Step 1: Set up the Cudy WR3000 v1 (AX3000) (do this first, while internet is still normal)
 
 OpenWrt defaults its LAN to `192.168.1.x` after flash. The Pi's default LAN is also `192.168.1.x`. That puts both on the same subnet with the Cudy bridging between them — routing breaks. Fix the Cudy before connecting it to anything.
 
-1. Download the OpenWrt image for the Cudy AX3000 from the OpenWrt table of hardware (search "OpenWrt Cudy AX3000").
-2. Connect a laptop to a Cudy LAN port. Log into the Cudy stock admin (default: `http://192.168.0.1` or `http://192.168.1.1` depending on firmware version).
-3. Go to Firmware Upgrade, upload the OpenWrt image, wait for it to finish rebooting.
-4. After flash the Cudy comes up at `http://192.168.1.1`. Connect a laptop to a LAN port and open that address.
-5. **Change the Cudy's LAN subnet:**
+### S/N check before flashing
+
+Check the sticker on the bottom of the router. If the serial number starts with **2543 or higher** (manufactured Nov 2025+), it is the "New Flash" revision — standard WR3000 v1 firmware will brick it, stop and research the correct image first. 2542 or lower (e.g. 2506) is a standard v1, proceed below.
+
+### Flash process (two steps — stock firmware blocks a direct OpenWrt upload)
+
+Download both files before you start:
+
+- **File A** (Cudy-signed intermediate image): Cudy's Google Drive — `https://drive.google.com/drive/folders/1BKVarlwlNxf7uJUtRhuMGUqeCa5KpMnj`
+  Look for the **WR3000 v1** folder without "recovery TFTP" in the name. Ignore WR3000E, WR3000P, WR3000S — those are different models.
+- **File B** (official OpenWrt sysupgrade): `https://firmware-selector.openwrt.org/?target=mediatek%2Ffilogic&id=cudy_wr3000-v1`
+  Download the **sysupgrade** image, not factory.
+
+1. Connect a laptop to a Cudy LAN port. Log into the Cudy stock admin (default: `http://192.168.0.1` or `http://192.168.1.1` depending on firmware version).
+2. Go to Firmware Upgrade. Upload **File A**. Wait for the reboot (~2 minutes).
+3. Router comes up at `http://192.168.1.1` running the intermediate OpenWrt.
+4. In LuCI: System -> Backup/Flash Firmware. Upload **File B** (sysupgrade). Uncheck "Keep settings". Click Flash. Wait for reboot.
+5. Router is now on clean OpenWrt. Connect a laptop to a LAN port and open `http://192.168.1.1`.
+6. **Change the Cudy's LAN subnet:**
    - Network -> Interfaces -> LAN -> Edit
    - Change IPv4 address from `192.168.1.1` to `192.168.20.1`
    - Save and apply. Cudy reboots. New admin is at `http://192.168.20.1`.
-6. **Get the Cudy's WAN MAC address** — needed for the Pi installer DHCP reservation step:
+7. **Get the Cudy's WAN MAC address** — needed for the Pi installer DHCP reservation step:
    - In OpenWrt: Network -> Interfaces -> WAN, look at Device or Status for the MAC address.
    - Write it down. Format: `aa:bb:cc:dd:ee:ff`
    - Do not use the sticker MAC — that is the LAN MAC. The WAN MAC may differ in OpenWrt.
-7. **Test Cudy in bypass mode** — proves Outcome B works before you need it:
+8. **Test Cudy in bypass mode** — proves Outcome B works before you need it:
    - Plug Cudy WAN port directly into an XB8 LAN port.
    - Wait 60 seconds. Confirm internet works on a device connected to Cudy WiFi.
    - Unplug and set the Cudy aside.
