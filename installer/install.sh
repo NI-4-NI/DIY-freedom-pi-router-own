@@ -41,7 +41,7 @@ prompt_default    SSID_5G           "5 GHz WiFi name (SSID)"            "Freedom
 prompt_default    SSID_2G           "2.4 GHz WiFi name (SSID)"          "Freedom"
 prompt_password   WPA_PASSPHRASE    "WiFi password (min 8 chars)"
 prompt_default    COUNTRY_CODE      "WiFi country code (2 letters)"     "US"
-prompt_default    LAN_SUBNET        "Wired LAN subnet (x.x.x)"          "192.168.1"
+prompt_default    LAN_SUBNET        "Wired LAN subnet (x.x.x)"          "192.168.10"
 prompt_default    WIFI_SUBNET       "5 GHz WiFi subnet (x.x.x)"         "192.168.2"
 prompt_default    WIFI_2G_SUBNET    "2.4 GHz WiFi subnet (x.x.x)"       "192.168.3"
 prompt_password   PIHOLE_ADMIN_PW   "Pi-hole admin password (min 8)"
