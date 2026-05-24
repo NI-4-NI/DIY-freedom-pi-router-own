@@ -217,6 +217,8 @@ Quick sanity checks before this gets cascaded:
 
 ## After this is done
 
-Plug the cable from the Pi 5's LAN port (UGREEN USB ethernet, `eth1`) into the Cudy's **WAN** port. Within 30 seconds the Cudy's WAN interface pulls a `192.168.10.x` lease from the Pi. Devices connected to the Cudy's Wi-Fi or LAN ports route through the Pi (and through Pi-hole) for everything outbound.
+Plug the cable from the Pi 5's LAN port (UGREEN USB ethernet, `eth1`) into the Cudy's **WAN** port. Within 30 seconds the Cudy's WAN interface pulls a `192.168.10.x` lease from the Pi. Devices on the Cudy's network route through the Pi for internet — that's just NAT, unavoidable by design.
+
+Pi-hole is separate. It only filters DNS for devices that are explicitly pointed at it. Cudy LAN devices use whatever DNS the Cudy's DHCP assigns them (by default the Cudy itself, which forwards upstream, bypassing Pi-hole). To opt a specific device into Pi-hole, manually set that device's DNS server to `192.168.10.1` (the Pi's LAN IP). Everything else is unfiltered.
 
 See [FAILOVER.md](FAILOVER.md) for what to do if the Pi dies and the Cudy needs to take over directly off the XB8.
